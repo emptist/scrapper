@@ -1,0 +1,52 @@
+# Web Video Analyzer
+
+A comprehensive Swift tool for analyzing web pages to identify and extract video content, including embedded videos, video metadata, and article associations.
+
+## Features
+
+- **Video Detection**: Identifies videos using HTML5 video tags, iframe embeds, and JavaScript-rendered content
+- **Article Analysis**: Detects articles containing embedded videos with metadata extraction
+- **Comprehensive Output**: Generates structured lists of video URLs with formats, resolutions, and hosting sources
+- **Multiple Export Formats**: JSON and HTML export options
+- **Error Handling**: Robust error handling for dynamic and protected content
+- **Duplicate Detection**: Prevents duplicate video entries
+- **Swift 6.2**: Built with latest Swift features and testing frameworks
+
+## Architecture
+
+This project follows MVVM (Model-View-ViewModel) architecture combined with Protocol-Oriented Programming (POP) principles:
+
+- **Models**: Video, Article, SiteStructure data models
+- **Views**: CLI interface for user interaction
+- **ViewModels**: Business logic and data transformation
+- **Protocols**: Flexible contracts for different implementations
+
+## Requirements
+
+- Swift 6.2+
+- macOS 14.0+
+- Internet connection for web scraping
+
+## Usage
+
+```swift
+let analyzer = VideoAnalyzer()
+let result = try await analyzer.analyze(url: "https://www.ultrasoundcases.info/appendicitis-6737/")
+try analyzer.export(result, format: .json)
+try analyzer.export(result, format: .html)
+```
+
+## Testing
+
+The project uses Swift's latest testing features for comprehensive unit and integration tests:
+
+```swift
+@testable import VideoAnalyzerCore
+import Testing
+
+struct VideoAnalyzerTests {
+    @Test func videoDetection() async throws {
+        // Test video detection logic
+    }
+}
+```

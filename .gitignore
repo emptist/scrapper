@@ -1,0 +1,271 @@
+# Swift
+# Build system
+.build/
+.buildDebug/
+.buildRelease/
+.buildReleaseDsyms/
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/
+*.xcodeproj/xcshareddata/
+
+# Swift Package Manager
+Package.resolved
+Package.pins
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# User-specific files
+*.xcuserstate
+*.xcuserdatad/
+
+# IDE
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+*.logs
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Cache
+cache/
+.cache/
+
+# Export files and analysis results
+export/
+analysis_results/
+*.json
+*.html
+!SampleOutputs/*.json
+!SampleOutputs/*.html
+
+# URL lists and input files
+*.txt
+!README.md
+!USAGE.md
+
+# Test results
+test_reports/
+*.testlog
+
+# Coverage reports
+*.xcresult
+*.gcov
+coverage.info
+
+# Sensitive configuration files
+config.json
+secrets.json
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Documentation
+docs/api/
+docs/generated/
+
+# Backup files
+*.bak
+*.backup
+*~
+.#*
+
+# Node.js (if used for any build tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (if used for any utilities)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Ruby
+*.gem
+.bundle/
+vendor/bundle/
+
+# Java/Kotlin
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Rust
+/target/
+**/*.rs.bk
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+**/*.go
+!**/examples/**/*.go
+
+# C/C++
+*.o
+*.ko
+*.obj
+*.elf
+*.ilk
+*.map
+*.exp
+*.gch
+*.pch
+*.lib
+*.a
+*.la
+*.lo
+*.dll
+*.so
+*.so.*
+*.dylib
+*.exe
+*.out
+*.app
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+*.db-journal
+
+# Archive files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Personal data and credentials
+passwords.txt
+credentials.json
+api_keys.txt
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Large media files (videos, images)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.wmv
+*.flv
+*.webm
+*.m4v
+*.3gp
+*.ogv
+*.ts
+*.mts
+*.vob
+*.asf
+*.rm
+*.rmvb
+*.mpg
+*.mpeg
+*.mpe
+*.mpv
+*.mp2v
+*.m2v
+*.mp2
+*.mpg2
+*.mpg4
+*.mp4v
+*.mp4s
+*.m4v
+*.mp2v
+*.mpv2
+*.mp2ps
+*.m2v
+
+# High-resolution images
+*.tiff
+*.tif
+*.raw
+*.cr2
+*.nef
+*.orf
+*.sr2
+*.dng
+*.arw
+*.rw2
+
+# Generated documentation
+docs/html/
+docs/man/
+man/
+
+# Build artifacts
+dist/
+build/
+out/
+obj/
+lib/
+bin/
+sbin/
+
+# Package manager files
+Cargo.lock
+go.mod
+go.sum
+composer.lock
+package-lock.json
+yarn.lock
+
+# Environment-specific files
+.env.development
+.env.production
+.env.staging
+local.properties
+local.gradle
+
+# Sentry
+.sentryclirc
+
+# Custom ignore rules for this project
+# Exclude any user input files
+user_urls/
+personal_urls/
+sensitive_urls/
+private_urls/
