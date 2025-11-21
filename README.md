@@ -16,13 +16,16 @@ A comprehensive Swift tool for analyzing web pages to identify and extract video
 
 This project follows MVVM (Model-View-ViewModel) architecture combined with Protocol-Oriented Programming (POP) principles and good separation of concerns:
 
-- **Models**: Video, Article, SiteStructure data models in VideoAnalyzerCore
-- **Views**: Basic UI with ContentView for minimal GUI interaction
+- **Models**: Video, Article, SiteStructure, and SiteAnalysis data models in VideoAnalyzerCore/Models/
+- **Views**: Modern SwiftUI interface with ContentView and modular components for intuitive GUI interaction
 - **Services**:
-  - **CommandLineHandler**: Manages all command-line operations and argument parsing
-  - **AnalysisService**: Handles all video analysis operations and result processing
-- **App Entry Point**: ScrapperApp as the main SwiftUI App entry point
-- **Protocols**: Flexible contracts for different implementations
+  - **CommandLineHandler**: Manages all command-line operations and argument parsing in WebVideoAnalyzer module
+  - **AnalysisService**: Handles all video analysis operations and result processing in WebVideoAnalyzer module
+  - **Core Services**: Additional specialized services located in VideoAnalyzerCore/Services/
+- **ViewModels**: Dedicated view models in VideoAnalyzerCore/ViewModels/ for business logic and state management
+- **Utils**: Utility functions and helpers in VideoAnalyzerCore/Utils/
+- **App Entry Point**: VideoFinderApp as the main SwiftUI App entry point with support for both GUI and command-line modes
+- **Protocols**: Flexible contracts throughout the codebase for extensibility and testability
 
 ## Requirements
 
@@ -43,6 +46,86 @@ let result = try await analyzer.analyze(url: "https://www.ultrasoundcases.info/a
 try analyzer.export(result, format: .json)
 try analyzer.export(result, format: .html)
 ```
+
+## Build and Installation
+
+### Building the GUI Application
+
+To build the macOS application bundle, use the provided build script:
+
+```bash
+# Make the build script executable if needed
+chmod +x ./build_macos_app.sh
+
+# Run the build script
+./build_macos_app.sh
+```
+
+This will compile the application and create a `WebVideoAnalyzer.app` bundle in the project directory, ready to be run on macOS.
+
+### Building as a Command-Line Tool
+
+To build the command-line version:
+
+```bash
+# Build the project
+swift build
+
+# Run the command-line tool
+swift run WebVideoAnalyzer <command> [options]
+```
+
+## Recent Improvements and Fixes
+
+The following significant improvements and fixes have been implemented in the latest version:
+
+- **SwiftUI Compatibility Fixes**: Updated SwiftUI modifiers and removed deprecated APIs for improved macOS compatibility
+- **Main Actor Isolation**: Implemented proper @MainActor annotations and async/await patterns for UI-related operations
+- **Closure Capture Safety**: Fixed "escaping closure captures mutating 'self' parameter" errors for more robust code
+- **ObservedObject Wrapper Improvements**: Corrected property wrapper usage for better state management
+- **Type Safety Enhancements**: Standardized model references (e.g., SiteAnalysis) for improved type consistency
+- **File Selection Improvements**: Updated NSOpenPanel implementation to use modern content type filtering
+- **Async UI Handling**: Implemented proper Task and await patterns for asynchronous UI operations
+
+## Command-Line Usage
+
+The Web Video Analyzer provides a comprehensive command-line interface for analyzing websites for video content. It supports analyzing individual URLs, processing batch files of URLs, and validating URLs before full analysis.
+
+### Available Commands
+
+```bash
+# Analyze a single URL for video content
+WebVideoAnalyzer analyze <url>
+
+# Analyze multiple URLs from a text file (one URL per line)
+WebVideoAnalyzer batch <file>
+
+# Validate a URL before performing full analysis
+WebVideoAnalyzer validate <url>
+
+# Display help information
+WebVideoAnalyzer --help
+WebVideoAnalyzer -h
+```
+
+### Examples
+
+```bash
+# Analyze a single ultrasound case page
+WebVideoAnalyzer analyze https://www.ultrasoundcases.info/appendicitis-6737/
+
+# Process multiple URLs from a file
+WebVideoAnalyzer batch urls.txt
+
+# Validate a URL before analysis
+WebVideoAnalyzer validate https://example.com
+```
+
+### Output
+
+Analysis results are saved to the `/tmp/` directory with filenames containing timestamps:
+- JSON format: `video_analysis_<timestamp>.json`
+- HTML format: `video_analysis_<timestamp>.html`
 
 ## Testing
 
