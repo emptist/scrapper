@@ -178,21 +178,15 @@ final class VideoAnalyzerEngineTests: XCTestCase {
                 )
             ],
             articles: [
-                Article(
-                    url: "https://example.com/article",
-                    title: "Test Article",
-                    publicationDate: Date(),
-                    author: "Test Author",
-                    excerpt: "Test excerpt",
-                    videoPositions: [
-                        VideoPosition(
-                            videoId: UUID(),
-                            positionInArticle: 150,
-                            context: "Video content follows: This demonstrates the technique."
-                        )
-                    ]
-                )
-            ],
+                  Article(
+                     url: URL(string: "https://example.com/article")!,
+                     title: "Test Article",
+                     author: "Test Author",
+                     publicationDate: Date(),
+                     mainContent: "Test content",
+                     videoPositions: []
+                  )
+              ],
             videoUrls: [
                 VideoUrlDetail(
                     video: Video(url: "https://example.com/video1.mp4", format: .mp4, hostingSource: "Local", embedType: .html5),
@@ -234,18 +228,12 @@ final class VideoAnalyzerEngineTests: XCTestCase {
             ],
             articles: [
                 Article(
-                    url: "https://example.com/case-study",
+                    url: URL(string: "https://example.com/case-study")!,
                     title: "Medical Case Study: Ultrasound Imaging",
-                    publicationDate: Date(timeIntervalSince1970: 1700000000),
                     author: "Dr. Researcher",
-                    excerpt: "This case study demonstrates advanced ultrasound imaging techniques for medical diagnosis.",
-                    videoPositions: [
-                        VideoPosition(
-                            videoId: UUID(),
-                            positionInArticle: 200,
-                            context: "The following ultrasound demonstrates: Note the key diagnostic features."
-                        )
-                    ]
+                    publicationDate: Date(timeIntervalSince1970: 1700000000),
+                    mainContent: "This case study demonstrates advanced ultrasound imaging techniques for medical diagnosis.",
+                    videoPositions: []
                 )
             ],
             videoUrls: [

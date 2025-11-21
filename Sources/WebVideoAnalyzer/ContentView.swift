@@ -370,7 +370,7 @@ struct ArticlesSection: View {
             } else {
                 ForEach(articles, id: \.id) { article in
                     VStack(alignment: .leading) {
-                        Text(article.title)
+                        Text(article.title ?? "Untitled Article")
                             .font(.headline)
                         Text("URL: \(article.url)")
                         if let author = article.author {
@@ -380,10 +380,7 @@ struct ArticlesSection: View {
                             Text("Published: \(date)")
                         }
                         Text("Videos in Article: \(article.videoPositions.count)")
-                        if let excerpt = article.excerpt {
-                            Text("Excerpt: \(excerpt)")
-                                .lineLimit(3)
-                        }
+                        // No excerpt property available in Article struct
                     }
                     .padding()
                     .background(Color.gray.opacity(0.05))

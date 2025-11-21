@@ -275,7 +275,7 @@ class AnalysisService {
         if !analysis.articles.isEmpty {
             print("\n=== Articles with Videos ===")
             for (index, article) in analysis.articles.enumerated() {
-                print("\n\(index + 1). \(article.title)")
+                print("\n\(index + 1). \(article.title ?? "Untitled Article")")
                 print("   URL: \(article.url)")
                 if let author = article.author {
                     print("   Author: \(author)")
@@ -284,9 +284,7 @@ class AnalysisService {
                     print("   Published: \(date)")
                 }
                 print("   Videos in Article: \(article.videoPositions.count)")
-                if let excerpt = article.excerpt {
-                    print("   Excerpt: \(excerpt)")
-                }
+                // No excerpt property available in Article struct
             }
         }
     }

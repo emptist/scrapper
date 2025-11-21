@@ -526,17 +526,38 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         }
 
         // Extract videos within the article
-        var videoPositions: [VideoPosition] = []
+        var videoReferences: [VideoReference] = []
         let videos = try await detectVideos(in: articleElement.outerHtml(), baseUrl: baseUrl)
 
         for (index, video) in videos.enumerated() {
-            // Generate a UUID from the video URL string for the VideoPosition
-            let videoUUID = UUID(uuidString: video.url) ?? UUID()
-            videoPositions.append(VideoPosition(
-                videoId: videoUUID,
-                positionInArticle: index,
-                context: video.context
-            ))
+            // Extract detailed context information using our enhanced extraction method
+            // Use empty string as fallback since video.htmlElement doesn't exist
+            let videoHtml = ""
+            let contextDetails = extractVideoContextDetails(from: videoHtml)
+            
+            // Build comprehensive element info dictionary
+            var elementInfo: [String: String] = [:]
+            elementInfo["html"] = videoHtml
+            elementInfo["tag"] = video.embedType.rawValue
+            elementInfo["xpath"] = "" // XPath not directly available in DetectedVideo
+            if let caption = contextDetails.caption {
+                elementInfo["caption"] = caption
+            }
+            if let section = contextDetails.documentSection {
+                elementInfo["section"] = section
+            }
+            
+            // Create VideoReference with enhanced context
+            // Generate a UUID for the video reference
+            let videoId = UUID().uuidString
+            let videoReference = VideoReference(
+                videoId: videoId,
+                position: index,
+                context: contextDetails.description ?? contextDetails.caption ?? video.context,
+                elementInfo: elementInfo
+            )
+            
+            videoReferences.append(videoReference)
         }
 
         // Create article URL (using baseUrl if no specific URL)
@@ -548,7 +569,7 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
             publicationDate: date,
             author: author,
             content: try articleElement.text(),
-            videoReferences: [],
+            videoReferences: videoReferences,
             metadata: [:]
         )
     }
@@ -560,18 +581,38 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         let date = extractPublicationDate(from: try doc.outerHtml())
 
         // Extract videos from the whole document
-        var videoPositions: [VideoPosition] = []
+        var videoReferences: [VideoReference] = []
         let videos = try await detectVideos(in: doc.outerHtml(), baseUrl: baseUrl)
 
         for (index, video) in videos.enumerated() {
-            // Generate a UUID from the video URL string for the VideoPosition
-            let videoUUID = UUID(uuidString: video.url) ?? UUID()
-            videoPositions.append(VideoPosition(
-                videoId: videoUUID,
-                positionInArticle: index,
-                context: nil,
-                elementInfo: [:]
-            ))
+            // Extract detailed context information using our enhanced extraction method
+            // Use empty string as fallback since video.htmlElement doesn't exist
+            let videoHtml = ""
+            let contextDetails = extractVideoContextDetails(from: videoHtml)
+            
+            // Build comprehensive element info dictionary
+            var elementInfo: [String: String] = [:]
+            elementInfo["html"] = videoHtml
+            elementInfo["tag"] = video.embedType.rawValue
+            elementInfo["xpath"] = "" // XPath not directly available in DetectedVideo
+            if let caption = contextDetails.caption {
+                elementInfo["caption"] = caption
+            }
+            if let section = contextDetails.documentSection {
+                elementInfo["section"] = section
+            }
+            
+            // Create VideoReference with enhanced context
+            // Generate a UUID for the video reference
+            let videoId = UUID().uuidString
+            let videoReference = VideoReference(
+                videoId: videoId,
+                position: index,
+                context: contextDetails.description ?? contextDetails.caption ?? video.context,
+                elementInfo: elementInfo
+            )
+            
+            videoReferences.append(videoReference)
         }
 
         return DetectedArticle(
@@ -580,7 +621,7 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
             publicationDate: date,
             author: author,
             content: try doc.text(),
-            videoReferences: [],
+            videoReferences: videoReferences,
             metadata: [:]
         )
     }
@@ -798,20 +839,126 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         return references
     }
 
-    private func extractVideoContext(from videoElement: String) -> String? {
-        // Look for surrounding text or descriptions
-        let contextPattern = #"<p[^>]*>(.*?)</p>"#
-        let regex = try? NSRegularExpression(pattern: contextPattern)
-
-        guard let regex = regex,
-              let match = regex.firstMatch(in: videoElement, options: [], range: NSRange(location: 0, length: videoElement.utf8.count)),
-              match.numberOfRanges > 1,
-              let range = Range(match.range(at: 1), in: videoElement) else {
-            return nil
+    // Changed to internal access level for testing purposes
+    internal func extractVideoContextDetails(from videoElement: String) -> (
+        precedingText: String?, 
+        followingText: String?, 
+        parentHeading: String?, 
+        parentHeadingLevel: Int?, 
+        caption: String?, 
+        description: String?, 
+        associatedParagraphs: [String], 
+        documentSection: String?
+    ) {
+        // Initialize default values
+        let precedingText: String? = nil
+        let followingText: String? = nil
+        var parentHeading: String? = nil
+        var parentHeadingLevel: Int? = nil
+        var caption: String? = nil
+        var description: String? = nil
+        var associatedParagraphs: [String] = []
+        var documentSection: String? = nil
+        
+        // Helper function to extract text content from HTML tag
+        func extractText(from pattern: String, in text: String) -> String? {
+            let regex = try? NSRegularExpression(pattern: pattern)
+            guard let regex = regex,
+                  let match = regex.firstMatch(in: text, options: [], range: NSRange(location: 0, length: text.utf8.count)),
+                  match.numberOfRanges > 1,
+                  let range = Range(match.range(at: 1), in: text) else {
+                return nil
+            }
+            
+            let result = String(text[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            return result.isEmpty ? nil : result
         }
-
-        let context = String(videoElement[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-        return context.isEmpty ? nil : context
+        
+        // Extract captions (common caption tags)
+        if let figcaption = extractText(from: #"<figcaption[^>]*>(.*?)</figcaption>"#, in: videoElement) {
+            caption = figcaption
+        } else if let captionText = extractText(from: #"<div[^>]*class=["']caption["'][^>]*>(.*?)</div>"#, in: videoElement) {
+            caption = captionText
+        }
+        
+        // Extract descriptions (alt text, title, etc.)
+        if let altText = extractText(from: #"alt=["']([^"']*)["']"#, in: videoElement) {
+            description = altText
+        } else if let titleText = extractText(from: #"title=["']([^"']*)["']"#, in: videoElement) {
+            description = titleText
+        }
+        
+        // Extract parent heading
+        if let headingMatch = try? NSRegularExpression(pattern: #"<(h[1-6])[^>]*>(.*?)</\1>"#),
+           let headingResult = headingMatch.firstMatch(in: videoElement, options: [], range: NSRange(location: 0, length: videoElement.utf8.count)),
+           headingResult.numberOfRanges > 2,
+           let headingTagRange = Range(headingResult.range(at: 1), in: videoElement),
+           let headingTextRange = Range(headingResult.range(at: 2), in: videoElement) {
+            
+            let headingTag = String(videoElement[headingTagRange])
+            let headingText = String(videoElement[headingTextRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            if !headingText.isEmpty {
+                parentHeading = headingText
+                parentHeadingLevel = Int(headingTag.dropFirst())
+            }
+        }
+        
+        // Extract associated paragraphs
+        let paragraphPattern = #"<p[^>]*>(.*?)</p>"#
+        if let paragraphRegex = try? NSRegularExpression(pattern: paragraphPattern) {
+            let paragraphMatches = paragraphRegex.matches(in: videoElement, options: [], range: NSRange(location: 0, length: videoElement.utf8.count))
+            
+            for match in paragraphMatches {
+                if match.numberOfRanges > 1,
+                   let range = Range(match.range(at: 1), in: videoElement) {
+                    
+                    let paragraph = String(videoElement[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !paragraph.isEmpty {
+                        associatedParagraphs.append(paragraph)
+                        // Limit to a reasonable number of paragraphs
+                        if associatedParagraphs.count >= 5 {
+                            break
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Try to determine document section based on parent div/class
+        if let sectionMatch = try? NSRegularExpression(pattern: #"<div[^>]*class=["'][^"']*section[^"']*["'][^>]*>(.*?)</div>"#),
+           let sectionResult = sectionMatch.firstMatch(in: videoElement, options: [], range: NSRange(location: 0, length: videoElement.utf8.count)),
+           sectionResult.numberOfRanges > 1,
+           let range = Range(sectionResult.range(at: 1), in: videoElement) {
+            
+            let section = String(videoElement[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            // Extract text from first heading in section to use as section title
+            if let sectionHeading = extractText(from: #"<h[1-6][^>]*>(.*?)</h[1-6]>"#, in: section) {
+                documentSection = sectionHeading
+            }
+        }
+        
+        // For preceding and following text, we'll need to extract these based on position
+        // This would typically be done when processing the full HTML document
+        // These placeholders will be updated later in the processing pipeline
+        
+        return (
+            precedingText: precedingText,
+            followingText: followingText,
+            parentHeading: parentHeading,
+            parentHeadingLevel: parentHeadingLevel,
+            caption: caption,
+            description: description,
+            associatedParagraphs: associatedParagraphs,
+            documentSection: documentSection
+        )
+    }
+    
+    // Keep original method for backward compatibility
+    private func extractVideoContext(from videoElement: String) -> String? {
+        // Use the new detailed extraction but return just the description or caption for backward compatibility
+        let details = extractVideoContextDetails(from: videoElement)
+        return details.description ?? details.caption
     }
 
     private func extractAttributes(from element: String) -> [String: String] {

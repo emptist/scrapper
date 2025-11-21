@@ -3,49 +3,88 @@ import Foundation
 /// Represents an article that may contain videos
 public struct Article: Codable, Equatable, Hashable, Sendable {
     public let id: UUID
-    public let url: String
-    public let title: String
-    public let publicationDate: Date?
+    public let url: URL
+    public let title: String?
+    public let description: String?
     public let author: String?
-    public let excerpt: String?
+    public let publicationDate: Date?
+    public let modifiedDate: Date?
+    public let mainContent: String?
     public let videoPositions: [VideoPosition]
-    public let metadata: [String: String]
-    public let discoveredAt: Date
     
     public init(
         id: UUID = UUID(),
-        url: String,
-        title: String,
-        publicationDate: Date? = nil,
+        url: URL,
+        title: String? = nil,
+        description: String? = nil,
         author: String? = nil,
-        excerpt: String? = nil,
-        videoPositions: [VideoPosition] = [],
-        metadata: [String: String] = [:]
+        publicationDate: Date? = nil,
+        modifiedDate: Date? = nil,
+        mainContent: String? = nil,
+        videoPositions: [VideoPosition] = []
     ) {
         self.id = id
         self.url = url
         self.title = title
-        self.publicationDate = publicationDate
+        self.description = description
         self.author = author
-        self.excerpt = excerpt
+        self.publicationDate = publicationDate
+        self.modifiedDate = modifiedDate
+        self.mainContent = mainContent
         self.videoPositions = videoPositions
-        self.metadata = metadata
-        self.discoveredAt = Date()
     }
 }
 
-/// Represents the position of a video within an article
+/// Represents the position and context of a video in an HTML document
 public struct VideoPosition: Codable, Equatable, Hashable, Sendable {
-    public let videoId: UUID
-    public let positionInArticle: Int
-    public let context: String?
-    public let elementInfo: [String: String]
+    public let id: UUID
+    public let xPath: String?
+    public let parentTag: String?
+    public let positionIndex: Int
+    public let isAboveTheFold: Bool
+    public let surroundingText: String?
+    public let contextSection: String?
+    public let precedingText: String?
+    public let followingText: String?
+    public let parentHeading: String?
+    public let parentHeadingLevel: Int?
+    public let caption: String?
+    public let description: String?
+    public let associatedParagraphs: [String]
+    public let documentSection: String?
     
-    public init(videoId: UUID, positionInArticle: Int, context: String? = nil, elementInfo: [String: String] = [:]) {
-        self.videoId = videoId
-        self.positionInArticle = positionInArticle
-        self.context = context
-        self.elementInfo = elementInfo
+    public init(
+        id: UUID = UUID(),
+        xPath: String? = nil,
+        parentTag: String? = nil,
+        positionIndex: Int = 0,
+        isAboveTheFold: Bool = false,
+        surroundingText: String? = nil,
+        contextSection: String? = nil,
+        precedingText: String? = nil,
+        followingText: String? = nil,
+        parentHeading: String? = nil,
+        parentHeadingLevel: Int? = nil,
+        caption: String? = nil,
+        description: String? = nil,
+        associatedParagraphs: [String] = [],
+        documentSection: String? = nil
+    ) {
+        self.id = id
+        self.xPath = xPath
+        self.parentTag = parentTag
+        self.positionIndex = positionIndex
+        self.isAboveTheFold = isAboveTheFold
+        self.surroundingText = surroundingText
+        self.contextSection = contextSection
+        self.precedingText = precedingText
+        self.followingText = followingText
+        self.parentHeading = parentHeading
+        self.parentHeadingLevel = parentHeadingLevel
+        self.caption = caption
+        self.description = description
+        self.associatedParagraphs = associatedParagraphs
+        self.documentSection = documentSection
     }
 }
 

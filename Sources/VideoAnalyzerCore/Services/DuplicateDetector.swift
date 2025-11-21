@@ -18,13 +18,15 @@ public class DefaultDuplicateDetector: DuplicateDetecting {
         var result: [Video] = []
         
         for video in videos {
+            let urlString = video.url
+            
             // Check if we've seen this video ID or URL before
-            if seenIds.contains(video.id) || seenUrls.contains(video.url) {
+            if seenIds.contains(video.id) || seenUrls.contains(urlString) {
                 continue
             }
             
             seenIds.insert(video.id)
-            seenUrls.insert(video.url)
+            seenUrls.insert(urlString)
             result.append(video)
         }
         
@@ -37,13 +39,15 @@ public class DefaultDuplicateDetector: DuplicateDetecting {
         var result: [Article] = []
         
         for article in articles {
+            let urlString = article.url.absoluteString
+            
             // Check if we've seen this article ID or URL before
-            if seenIds.contains(article.id) || seenUrls.contains(article.url) {
+            if seenIds.contains(article.id) || seenUrls.contains(urlString) {
                 continue
             }
             
             seenIds.insert(article.id)
-            seenUrls.insert(article.url)
+            seenUrls.insert(urlString)
             result.append(article)
         }
         
