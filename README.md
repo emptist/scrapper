@@ -29,6 +29,11 @@ This project follows MVVM (Model-View-ViewModel) architecture combined with Prot
 - Swift 6.2+
 - macOS 14.0+
 - Internet connection for web scraping
+- SwiftLint for code quality enforcement (recommended)
+
+## Code Quality
+
+This project follows strict code quality guidelines to ensure maintainable and professional code. See [CODE_QUALITY_GUIDELINES.md](CODE_QUALITY_GUIDELINES.md) for detailed standards and enforcement mechanisms.
 
 ## Usage
 
