@@ -14,11 +14,14 @@ A comprehensive Swift tool for analyzing web pages to identify and extract video
 
 ## Architecture
 
-This project follows MVVM (Model-View-ViewModel) architecture combined with Protocol-Oriented Programming (POP) principles:
+This project follows MVVM (Model-View-ViewModel) architecture combined with Protocol-Oriented Programming (POP) principles and good separation of concerns:
 
-- **Models**: Video, Article, SiteStructure data models
-- **Views**: CLI interface for user interaction
-- **ViewModels**: Business logic and data transformation
+- **Models**: Video, Article, SiteStructure data models in VideoAnalyzerCore
+- **Views**: Basic UI with ContentView for minimal GUI interaction
+- **Services**:
+  - **CommandLineHandler**: Manages all command-line operations and argument parsing
+  - **AnalysisService**: Handles all video analysis operations and result processing
+- **App Entry Point**: ScrapperApp as the main SwiftUI App entry point
 - **Protocols**: Flexible contracts for different implementations
 
 ## Requirements

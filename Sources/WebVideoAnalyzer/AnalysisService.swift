@@ -1,94 +1,22 @@
 import Foundation
 import VideoAnalyzerCore
 
-// Main application entry point with @main attribute
-@main
-struct WebVideoAnalyzerApp {
-    static func main() async {
-        let logger = DefaultLogger()
-        let analyzer = VideoAnalyzer()
-        
-        logger.info("Web Video Analyzer starting...")
-        
-        // Parse command line arguments
-        let arguments = CommandLine.arguments
-        
-        guard arguments.count > 1 else {
-            Self.printUsage()
-            return
-        }
-        
-        let command = arguments[1]
-        
-        switch command {
-        case "analyze":
-            if arguments.count < 3 {
-                print("Error: URL required for analyze command")
-                Self.printUsage()
-                return
-            }
-            
-            let url = arguments[2]
-            await Self.performAnalysis(url: url, analyzer: analyzer, logger: logger)
-            
-        case "batch":
-            if arguments.count < 3 {
-                print("Error: File path required for batch command")
-                Self.printUsage()
-                return
-            }
-            
-            let filePath = arguments[2]
-            await Self.performBatchAnalysis(filePath: filePath, analyzer: analyzer, logger: logger)
-            
-        case "validate":
-            if arguments.count < 3 {
-                print("Error: URL required for validate command")
-                Self.printUsage()
-                return
-            }
-            
-            let url = arguments[2]
-            await Self.performValidation(url: url, analyzer: analyzer, logger: logger)
-            
-        case "--help", "-h":
-            Self.printUsage()
-            
-        default:
-            print("Unknown command: \(command)")
-            Self.printUsage()
-        }
+/// Service responsible for handling all video analysis operations
+class AnalysisService {
+    private let logger: DefaultLogger
+    
+    /// Initializes the analysis service with a logger
+    /// - Parameter logger: The logger instance for logging messages
+    init(logger: DefaultLogger) {
+        self.logger = logger
     }
     
-    static func printUsage() {
-        print("""
-        Web Video Analyzer - Comprehensive video content analysis tool
-        
-        Usage: WebVideoAnalyzer <command> [options]
-        
-        Commands:
-          analyze <url>         Analyze a single URL for video content
-          batch <file>          Analyze multiple URLs from a file
-          validate <url>        Validate a URL before analysis
-        
-        Options:
-          --help, -h           Show this help message
-        
-        Examples:
-          WebVideoAnalyzer analyze https://www.ultrasoundcases.info/appendicitis-6737/
-          WebVideoAnalyzer batch urls.txt
-          WebVideoAnalyzer validate https://example.com
-        
-        Output files are saved to /tmp/ directory:
-          - video_analysis_<timestamp>.json (JSON format)
-          - video_analysis_<timestamp>.html (HTML format)
-        """)
-    }
-    
-    private static func performAnalysis(url: String, analyzer: VideoAnalyzer, logger: DefaultLogger) async {
+    /// Performs analysis on a single URL
+    func performAnalysis(url: String) async {
         logger.info("Starting analysis for: \(url)")
         
         do {
+            let analyzer = VideoAnalyzer()
             let analysis = try await analyzer.analyze(url: url)
             
             // Export results in both formats
@@ -164,7 +92,8 @@ struct WebVideoAnalyzerApp {
         }
     }
     
-    private static func performBatchAnalysis(filePath: String, analyzer: VideoAnalyzer, logger: DefaultLogger) async {
+    /// Performs batch analysis on URLs from a file
+    func performBatchAnalysis(filePath: String) async {
         logger.info("Starting batch analysis from file: \(filePath)")
         
         do {
@@ -178,6 +107,7 @@ struct WebVideoAnalyzerApp {
             
             print("Found \(urls.count) URLs to analyze")
             
+            let analyzer = VideoAnalyzer()
             let analyses = try await analyzer.analyze(urls: urls)
             
             // Process and save results
@@ -232,10 +162,12 @@ struct WebVideoAnalyzerApp {
         }
     }
     
-    private static func performValidation(url: String, analyzer: VideoAnalyzer, logger: DefaultLogger) async {
+    /// Validates a URL
+    func performValidation(url: String) async {
         logger.info("Validating URL: \(url)")
         
         do {
+            let analyzer = VideoAnalyzer()
             let validation = try await analyzer.validate(url: url)
             
             if validation.isValid {
