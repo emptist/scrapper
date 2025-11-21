@@ -9,9 +9,9 @@ struct VideoFinderApp: App {
     private let analysisService: AnalysisService
     private let commandLineHandler: CommandLineHandler
     
-    // Default initializer
+    // Default initialiser
     init() {
-        // Initialize services with dependencies
+        // Initialise services with dependencies
         self.analysisService = AnalysisService(logger: logger)
         self.commandLineHandler = CommandLineHandler(logger: logger, analysisService: analysisService)
     }
