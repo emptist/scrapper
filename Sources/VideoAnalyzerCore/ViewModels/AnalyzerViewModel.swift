@@ -1,7 +1,7 @@
 import Foundation
 
 /// Protocol for ViewModel functionality
-public protocol ViewModel: ObservableObject {
+@MainActor public protocol ViewModel: ObservableObject {
     associatedtype State
     associatedtype Action
     
@@ -36,7 +36,7 @@ public enum AnalyzerViewModelAction {
 }
 
 /// ViewModel for the main video analyzer interface
-public class AnalyzerViewModel: ViewModel {
+@MainActor public class AnalyzerViewModel: ViewModel {
     private let videoAnalyzer: VideoAnalyzerEngine
     private let logger: Logging
     
@@ -51,79 +51,129 @@ public class AnalyzerViewModel: ViewModel {
     public func handle(_ action: AnalyzerViewModelAction) {
         switch action {
         case .startAnalysis(let url):
+            // Direct state updates on MainActor
+            state.isAnalyzing = true
+            state.progressMessage = "Validating URL..."
+            state.errorMessage = nil
+            
+            // Use regular Task since we're in an actor-isolated context
             Task {
-                await performAnalysis(url)
+                await performAnalysis(url: url)
             }
             
         case .exportAnalysis(let format):
+            guard let analysis = state.analysisResult else {
+                state.errorMessage = "No analysis results to export"
+                return
+            }
+            
+            // Direct state updates on MainActor
+            state.progressMessage = "Exporting results in \(format.rawValue) format..."
+            
+            // Capture necessary values
+            let analysisCopy = analysis
+            let formatCopy = format
+            
+            // Use regular Task since we're in an actor-isolated context
             Task {
-                await performExport(format)
+                await performExport(
+                    analysis: analysisCopy,
+                    format: formatCopy
+                )
             }
             
         case .clearResults:
+            // Direct state update on MainActor
             state = AnalyzerViewModelState()
             
         case .showError(let message):
+            // Direct state updates on MainActor
             state.errorMessage = message
             state.isAnalyzing = false
             state.progressMessage = ""
             
         case .updateProgress(let message):
+            // Direct state update on MainActor
             state.progressMessage = message
         }
     }
     
-    // MARK: - Private Methods
+    // MARK: - Private Static Methods
     
-    @MainActor
-    private func performAnalysis(_ url: String) async {
-        logger.info("Starting analysis from ViewModel for URL: \(url)")
-        state.isAnalyzing = true
-        state.progressMessage = "Validating URL..."
-        state.errorMessage = nil
+    private func performAnalysis(url: String) async {
+        logger.info("Starting analysis for URL: \(url)")
         
-        do {
-            let analysis = try await videoAnalyzer.analyze(url: url)
-            state.analysisResult = analysis
-            state.progressMessage = "Analysis completed successfully"
-            
-            if !analysis.errorLog.isEmpty {
-                logger.warning("Analysis completed with errors: \(analysis.errorLog)")
-            }
-            
-        } catch {
-            logger.error("Analysis failed: \(error.localizedDescription)")
-            state.errorMessage = error.localizedDescription
+        // Update progress
+        await MainActor.run {
+            state.progressMessage = "Analyzing video content..."
         }
         
-        state.isAnalyzing = false
+        do {
+            let analyzer = VideoAnalyzer()
+            let result = try await analyzer.analyze(url: url)
+            
+            // Update state on main actor
+            await MainActor.run {
+                state.analysisResult = result
+                state.progressMessage = "Analysis completed successfully"
+                state.isAnalyzing = false
+                
+                if !result.errorLog.isEmpty {
+                    logger.warning("Analysis completed with errors: \(result.errorLog)")
+                }
+            }
+        } catch {
+            let errorMsg = error.localizedDescription
+            logger.error("Analysis failed: \(errorMsg)")
+            
+            // Handle errors on main actor
+            await MainActor.run {
+                state.errorMessage = errorMsg
+                state.isAnalyzing = false
+            }
+        }
     }
     
-    @MainActor
-    private func performExport(_ format: ExportFormat) async {
-        guard let analysis = state.analysisResult else {
-            state.errorMessage = "No analysis results to export"
-            return
-        }
-        
-        state.progressMessage = "Exporting results in \(format.rawValue) format..."
-        
+    private func performExport(analysis: SiteAnalysis, format: ExportFormat) async {
         do {
-            let data = try await videoAnalyzer.export(analysis, format: format)
-            state.exportProgress = 1.0
+            // Capture format before passing to non-isolated method
+            let formatCopy = format
+            let analyzer = VideoAnalyzer()
+            let data = try await analyzer.export(analysis, format: formatCopy)
             
-            // Save to file (in a real app, this would use file picker)
-            let filename = "video_analysis_\(Date().timeIntervalSince1970).\(format.rawValue)"
-            let fileURL = URL(fileURLWithPath: "/tmp/\(filename)")
-            try data.write(to: fileURL)
+            // Capture necessary values before MainActor.run
+            let formatRawValue = formatCopy.rawValue
             
-            state.progressMessage = "Export completed: \(filename)"
-            
+            // Update state and write to file
+            await MainActor.run {
+                defer {
+                    state.exportProgress = 0.0
+                }
+                
+                do {
+                    state.exportProgress = 1.0
+                    
+                    // Save to file
+                    let filename = "video_analysis_\(Date().timeIntervalSince1970).\(formatRawValue)"
+                    let fileURL = URL(fileURLWithPath: "/tmp/\(filename)")
+                    try data.write(to: fileURL)
+                    
+                    state.progressMessage = "Export completed: \(filename)"
+                } catch {
+                    let errorMsg = error.localizedDescription
+                    logger.error("File write failed: \(errorMsg)")
+                    state.errorMessage = "Export failed: \(errorMsg)"
+                }
+            }
         } catch {
-            logger.error("Export failed: \(error.localizedDescription)")
-            state.errorMessage = "Export failed: \(error.localizedDescription)"
+            let errorMessage = error.localizedDescription
+            logger.error("Export failed: \(errorMessage)")
+            
+            // Handle errors on main actor
+            await MainActor.run {
+                state.errorMessage = "Export failed: \(errorMessage)"
+                state.exportProgress = 0.0
+            }
         }
-        
-        state.exportProgress = 0.0
     }
 }

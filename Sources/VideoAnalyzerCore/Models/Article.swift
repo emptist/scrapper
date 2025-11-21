@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents an article that may contain videos
-public struct Article: Codable, Equatable, Hashable {
+public struct Article: Codable, Equatable, Hashable, Sendable {
     public let id: UUID
     public let url: String
     public let title: String
@@ -35,7 +35,7 @@ public struct Article: Codable, Equatable, Hashable {
 }
 
 /// Represents the position of a video within an article
-public struct VideoPosition: Codable, Equatable, Hashable {
+public struct VideoPosition: Codable, Equatable, Hashable, Sendable {
     public let videoId: UUID
     public let positionInArticle: Int
     public let context: String?
@@ -50,7 +50,7 @@ public struct VideoPosition: Codable, Equatable, Hashable {
 }
 
 /// Represents the overall site structure and analysis results
-public struct SiteAnalysis: Codable, Equatable, Hashable {
+public struct SiteAnalysis: Codable, Equatable, Hashable, Sendable {
     public let id: UUID
     public let targetUrl: String
     public let siteUrl: String
@@ -84,7 +84,7 @@ public struct SiteAnalysis: Codable, Equatable, Hashable {
 }
 
 /// Represents detailed information about a video URL
-public struct VideoUrlDetail: Codable, Equatable, Hashable {
+public struct VideoUrlDetail: Codable, Equatable, Hashable, Sendable {
     public let id: UUID
     public let video: Video
     public let originalUrl: String
@@ -113,7 +113,7 @@ public struct VideoUrlDetail: Codable, Equatable, Hashable {
 }
 
 /// Represents accessibility and technical information about a video
-public struct AccessibilityInfo: Codable, Equatable, Hashable {
+public struct AccessibilityInfo: Codable, Equatable, Hashable, Sendable {
     public let isAccessible: Bool
     public let requiresAuthentication: Bool
     public let blockedRegions: [String]
@@ -135,8 +135,8 @@ public struct AccessibilityInfo: Codable, Equatable, Hashable {
     }
 }
 
-/// Represents streaming information for video content
-public struct StreamingInfo: Codable, Equatable, Hashable {
+////** Represents streaming information for video content */
+public struct StreamingInfo: Codable, Equatable, Hashable, Sendable {
     public let streamingType: StreamingType
     public let qualityOptions: [QualityOption]
     public let subtitleTracks: [SubtitleTrack]
@@ -156,7 +156,7 @@ public struct StreamingInfo: Codable, Equatable, Hashable {
 }
 
 /// Represents the type of streaming
-public enum StreamingType: String, Codable, CaseIterable {
+public enum StreamingType: String, Codable, CaseIterable, Sendable {
     case progressive = "progressive"
     case hls = "hls"
     case dash = "dash"
@@ -165,7 +165,7 @@ public enum StreamingType: String, Codable, CaseIterable {
 }
 
 /// Represents quality options for streaming video
-public struct QualityOption: Codable, Equatable, Hashable {
+public struct QualityOption: Codable, Equatable, Hashable, Sendable {
     public let resolution: String
     public let bitrate: Int
     public let codec: String
@@ -180,7 +180,7 @@ public struct QualityOption: Codable, Equatable, Hashable {
 }
 
 /// Represents subtitle tracks
-public struct SubtitleTrack: Codable, Equatable, Hashable {
+public struct SubtitleTrack: Codable, Equatable, Hashable, Sendable {
     public let language: String
     public let label: String
     public let url: String
@@ -193,7 +193,7 @@ public struct SubtitleTrack: Codable, Equatable, Hashable {
 }
 
 /// Represents audio tracks
-public struct AudioTrack: Codable, Equatable, Hashable {
+public struct AudioTrack: Codable, Equatable, Hashable, Sendable {
     public let language: String
     public let label: String
     public let channelConfiguration: String

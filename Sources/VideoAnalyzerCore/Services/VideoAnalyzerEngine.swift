@@ -106,10 +106,19 @@ public class VideoAnalyzer: VideoAnalyzerEngine {
         var results: [SiteAnalysis] = []
         
         for batch in urls.chunked(into: maxConcurrent) {
+            // Use a different approach to avoid data races in task group
             let batchResults = try await withThrowingTaskGroup(of: SiteAnalysis.self) { group in
+                // Process each URL without capturing the method reference
                 for url in batch {
                     group.addTask {
-                        return try await self.analyze(url: url)
+                        // Create a fresh instance inside each task
+                        let localAnalyzer = VideoAnalyzer(
+                            httpClient: DefaultHTTPClient(),
+                            htmlParser: HTMLParserService(),
+                            logger: DefaultLogger(),
+                            duplicateDetector: DefaultDuplicateDetector()
+                        )
+                        return try await localAnalyzer.analyze(url: url)
                     }
                 }
                 
@@ -267,8 +276,15 @@ public class VideoAnalyzer: VideoAnalyzerEngine {
     
     private func convertVideoReferences(_ references: [VideoReference], videos: [Video]) -> [VideoPosition] {
         return references.compactMap { reference in
-            guard let video = videos.first(where: { $0.url.contains(reference.videoId) }) ||
-                           videos.first(where: { $0.metadata["videoId"] == reference.videoId }) else {
+            // First try to find by URL containing videoId
+            var foundVideo: Video? = videos.first(where: { $0.url.contains(reference.videoId) })
+            
+            // If not found, try by metadata
+            if foundVideo == nil {
+                foundVideo = videos.first(where: { $0.metadata["videoId"] == reference.videoId })
+            }
+            
+            guard let video = foundVideo else {
                 return nil
             }
             
@@ -346,7 +362,7 @@ public class VideoAnalyzer: VideoAnalyzerEngine {
                     <li>Total Videos: \(analysis.videos.count)</li>
                     <li>Total Articles: \(analysis.articles.count)</li>
                     <li>Video URL Details: \(analysis.videoUrls.count)</li>
-                    \(if !analysis.errorLog.isEmpty { "<li>Errors: \(analysis.errorLog.count)</li>" } else { "" })
+                    \(!analysis.errorLog.isEmpty ? "<li>Errors: \(analysis.errorLog.count)</li>" : "")
                 </ul>
             </div>
             
@@ -391,8 +407,7 @@ public class VideoAnalyzer: VideoAnalyzerEngine {
                 }.joined(separator: "\n"))
             </div>
             
-            \(if !analysis.videoUrls.isEmpty {
-                """
+            \(!analysis.videoUrls.isEmpty ? """
                 <div class="video-details">
                     <h2>Video URL Details</h2>
                     <table>
@@ -418,24 +433,21 @@ public class VideoAnalyzer: VideoAnalyzerEngine {
                         }.joined(separator: "\n"))
                     </table>
                 </div>
-                """
-            } else { "" })
+                """ : "")
             
-            \(if !analysis.errorLog.isEmpty {
-                """
+            \(!analysis.errorLog.isEmpty ? """
                 <div class="errors">
                     <h2>Errors Encountered</h2>
                     <ul>
-                        \(analysis.errorLog.map { "<li>\\($0)</li>" }.joined(separator: "\n"))
+                        \(analysis.errorLog.map { error in "<li>\\(error)</li>" }.joined(separator: "\n"))
                     </ul>
                 </div>
-                """
-            } else { "" })
+                """ : "")
         </body>
         </html>
         """
         
-        return html.data(using: .utf8) ?? Data()
+        return html.data(using: String.Encoding.utf8) ?? Data()
     }
     
     // MARK: - Utility Methods
@@ -530,7 +542,7 @@ public struct ValidationResult {
     }
 }
 
-public enum ExportFormat: String, CaseIterable {
+public enum ExportFormat: String, CaseIterable, Sendable {
     case json = "json"
     case html = "html"
 }

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftSoup
 
 /// Service for parsing HTML content and extracting video and article information
 public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
@@ -17,9 +18,9 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         
         let videos = try await extractVideoElements(from: html, baseUrl: baseUrl)
         let articles = try await extractArticles(from: html, baseUrl: baseUrl)
-        let scripts = extractScriptTags(from: html)
-        let styles = extractStyleTags(from: html)
-        let links = extractLinks(from: html)
+        let scripts = try extractScriptTags(from: html)
+        let styles = try extractStyleTags(from: html)
+        let links = try extractLinks(from: html)
         
         return ParsedHTML(
             document: html,
@@ -58,48 +59,6 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         
         logger.info("Found \(detectedVideos.count) video elements")
         return detectedVideos
-    }
-    
-    public func extractArticles(from html: String, baseUrl: String) async throws -> [DetectedArticle] {
-        logger.info("Extracting articles from HTML")
-        
-        // Use regex patterns to find article elements
-        let articlePatterns = [
-            #"<article[^>]*>(.*?)</article>"#,
-            #"<div[^>]*class="[^"]*article[^"]*"[^>]*>(.*?)</div>"#,
-            #"<div[^>]*class="[^"]*post[^"]*"[^>]*>(.*?)</div>"#,
-            #"<div[^>]*class="[^"]*entry[^"]*"[^>]*>(.*?)</div>"#
-        ]
-        
-        var detectedArticles: [DetectedArticle] = []
-        
-        for pattern in articlePatterns {
-            let regex = try NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators])
-            let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
-            
-            for match in matches {
-                guard match.numberOfRanges > 1,
-                      let range = Range(match.range(at: 1), in: html),
-                      let articleElement = try extractArticleInfo(from: String(html[range]), baseUrl: baseUrl) else {
-                    continue
-                }
-                detectedArticles.append(articleElement)
-            }
-        }
-        
-        // If no articles found, treat the whole page as one article
-        if detectedArticles.isEmpty {
-            let wholePageArticle = try extractArticleInfo(from: html, baseUrl: baseUrl)
-            if let article = wholePageArticle {
-                detectedArticles.append(article)
-            }
-        }
-        
-        // Remove duplicates
-        detectedArticles = removeDuplicateArticles(detectedArticles)
-        
-        logger.info("Found \(detectedArticles.count) articles")
-        return detectedArticles
     }
     
     // MARK: - VideoDetecting Protocol Implementation
@@ -144,9 +103,8 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         }
         
         // Extract format from URL
-        if let format = VideoFormat(from: url).rawValue {
-            metadata["format"] = format
-        }
+        let format = VideoFormat(from: url)
+        metadata["format"] = format.rawValue
         
         // Extract quality information
         if let quality = attributes["quality"] {
@@ -164,93 +122,105 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
     // MARK: - ContentExtracting Protocol Implementation
     
     public func extractArticles(from html: String, baseUrl: String) async throws -> [DetectedArticle] {
+        logger.info("Extracting articles from HTML")
+        // Delegate to the existing implementation
         return try await extractArticlesFromHTML(html, baseUrl: baseUrl)
     }
     
     public func extractPublicationDate(from html: String) -> Date? {
-        let datePatterns = [
-            #"<meta[^>]*property="[^"]*date[^"]*"[^>]*content="([^"]*)""#,
-            #"<meta[^>]*name="[^"]*date[^"]*"[^>]*content="([^"]*)""#,
-            #"<time[^>]*datetime="([^"]*)""#,
-            #"(\d{4}-\d{2}-\d{2})"#,
-            #"(\d{1,2}/\d{1,2}/\d{4})"#
-        ]
-        
-        for pattern in datePatterns {
-            let regex = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
-            let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
+        do {
+            let doc = try SwiftSoup.parse(html)
             
-            for match in matches {
-                guard match.numberOfRanges > 1,
-                      let range = Range(match.range(at: 1), in: html) else {
-                    continue
-                }
-                let dateString = String(html[range])
-                
-                // Try multiple date formats
-                let dateFormatters = [
-                    ISO8601DateFormatter(),
-                    DateFormatter.dateTime,
-                    DateFormatter.monthDayYear,
-                    DateFormatter.yearMonthDay
-                ]
-                
-                for formatter in dateFormatters {
-                    if let date = formatter.date(from: dateString) {
+            // Try meta tags with property or name containing "date"
+            let dateMetaTags = try doc.select("meta[property*=date], meta[name*=date]")
+            for metaTag in dateMetaTags {
+                if let content = try? metaTag.attr("content"), !content.isEmpty {
+                    if let date = parseDate(content) {
                         return date
                     }
                 }
             }
+            
+            // Try time tags with datetime attribute
+            let timeTags = try doc.select("time[datetime]")
+            for timeTag in timeTags {
+                if let datetime = try? timeTag.attr("datetime"), !datetime.isEmpty {
+                    if let date = parseDate(datetime) {
+                        return date
+                    }
+                }
+            }
+            
+            // Fallback to regex for common date patterns
+            let datePatterns = [
+                #"(\d{4}-\d{2}-\d{2})"#,
+                #"(\d{1,2}/\d{1,2}/\d{4})"#
+            ]
+            
+            for pattern in datePatterns {
+                if let regex = try? NSRegularExpression(pattern: pattern) {
+                    let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
+                    for match in matches {
+                        if match.numberOfRanges > 1,
+                           let range = Range(match.range(at: 1), in: html) {
+                            let dateString = String(html[range])
+                            if let date = parseDate(dateString) {
+                                return date
+                            }
+                        }
+                    }
+                }
+            }
+        } catch {
+            logger.error("Error extracting publication date: \(error)")
         }
         
         return nil
     }
     
     public func extractAuthor(from html: String) -> String? {
-        let authorPatterns = [
-            #"<meta[^>]*property="[^"]*author[^"]*"[^>]*content="([^"]*)""#,
-            #"<meta[^>]*name="[^"]*author[^"]*"[^>]*content="([^"]*)""#,
-            #"<span[^>]*class="[^"]*author[^"]*"[^>]*>(.*?)</span>"#,
-            #"<div[^>]*class="[^"]*author[^"]*"[^>]*>(.*?)</div>"#
-        ]
-        
-        for pattern in authorPatterns {
-            let regex = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
-            let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
+        do {
+            let doc = try SwiftSoup.parse(html)
             
-            for match in matches {
-                guard match.numberOfRanges > 1,
-                      let range = Range(match.range(at: 1), in: html) else {
-                    continue
-                }
-                let authorString = String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-                if !authorString.isEmpty {
-                    return authorString
+            // Try meta tags with property or name containing "author"
+            let authorMetaTags = try doc.select("meta[property*=author], meta[name*=author]")
+            for metaTag in authorMetaTags {
+                if let content = try? metaTag.attr("content"), !content.isEmpty {
+                    return content.trimmingCharacters(in: .whitespacesAndNewlines)
                 }
             }
+            
+            // Try span or div tags with class containing "author"
+            let authorElements = try doc.select("span[class*=author], div[class*=author]")
+            for element in authorElements {
+                if let text = try? element.text(), !text.isEmpty {
+                    return text.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+            }
+        } catch {
+            logger.error("Error extracting author: \(error)")
         }
         
         return nil
     }
     
     public func extractTitle(from html: String) -> String {
-        let titlePattern = #"<title[^>]*>(.*?)</title>"#
-        let regex = try NSRegularExpression(pattern: titlePattern, options: .caseInsensitive)
-        
-        if let match = regex.firstMatch(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count)),
-           match.numberOfRanges > 1,
-           let range = Range(match.range(at: 1), in: html) {
-            return String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-        
-        // Fallback to h1 tag
-        let h1Pattern = #"<h1[^>]*>(.*?)</h1>"#
-        let h1Regex = try NSRegularExpression(pattern: h1Pattern, options: .caseInsensitive)
-        
-        if let match = h1Regex.firstMatch(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count)),
-           match.numberOfRanges > 1,
-           let range = Range(match.range(at: 1), in: html) {
-            return String(html[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+        do {
+            let doc = try SwiftSoup.parse(html)
+            
+            // Try title tag first
+            if let titleElement = try doc.select("title").first(),
+               let titleText = try? titleElement.text(), !titleText.isEmpty {
+                return titleText.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            
+            // Fallback to h1 tag
+            if let h1Element = try doc.select("h1").first(),
+               let h1Text = try? h1Element.text(), !h1Text.isEmpty {
+                return h1Text.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+        } catch {
+            logger.error("Error extracting title: \(error)")
         }
         
         return "Untitled"
@@ -259,134 +229,124 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
     // MARK: - Private Helper Methods
     
     private func detectHTML5Videos(in html: String, baseUrl: String) async throws -> [DetectedVideo] {
-        let videoPattern = #"<video[^>]*>(.*?)</video>"#
-        let regex = try NSRegularExpression(pattern: videoPattern, options: [.dotMatchesLineSeparators])
-        let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
-        
         var videos: [DetectedVideo] = []
         
-        for match in matches {
-            guard match.numberOfRanges > 0,
-                  let range = Range(match.range(at: 0), in: html) else {
-                continue
-            }
+        do {
+            let doc = try SwiftSoup.parse(html)
+            let videoElements = try doc.select("video")
             
-            let videoElement = String(html[range])
-            let attributes = extractAttributes(from: videoElement)
-            
-            // Extract video sources
-            let sourcePattern = #"<source[^>]*src="([^"]*)"[^>]*>"#
-            let sourceRegex = try NSRegularExpression(pattern: sourcePattern)
-            let sourceMatches = sourceRegex.matches(in: videoElement, options: [], range: NSRange(location: 0, length: videoElement.utf8.count))
-            
-            for sourceMatch in sourceMatches {
-                guard sourceMatch.numberOfRanges > 1,
-                      let sourceRange = Range(sourceMatch.range(at: 1), in: videoElement) else {
-                    continue
+            for videoElement in videoElements {
+                let attributes = try extractAttributes(from: videoElement)
+                
+                // Extract video sources from source tags
+                let sourceElements = try videoElement.select("source")
+                for sourceElement in sourceElements {
+                    if let src = try? sourceElement.attr("src"), !src.isEmpty {
+                        let videoUrl = resolveUrl(src, baseUrl: baseUrl)
+                        
+                        let detectedVideo = DetectedVideo(
+                            url: videoUrl,
+                            title: attributes["title"],
+                            embedType: .html5,
+                            attributes: attributes,
+                            position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
+                            context: attributes["poster"]
+                        )
+                        
+                        videos.append(detectedVideo)
+                    }
                 }
                 
-                let videoUrl = resolveUrl(String(videoElement[sourceRange]), baseUrl: baseUrl)
-                let metadata = extractVideoMetadata(from: attributes, url: videoUrl)
-                
-                let detectedVideo = DetectedVideo(
-                    url: videoUrl,
-                    title: attributes["title"],
-                    embedType: .html5,
-                    attributes: attributes,
-                    position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
-                    context: attributes["poster"]
-                )
-                
-                videos.append(detectedVideo)
+                // Handle direct src attribute on video tag
+                if let src = try? videoElement.attr("src"), !src.isEmpty {
+                    let videoUrl = resolveUrl(src, baseUrl: baseUrl)
+                    
+                    let detectedVideo = DetectedVideo(
+                        url: videoUrl,
+                        title: attributes["title"],
+                        embedType: .html5,
+                        attributes: attributes,
+                        position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
+                        context: attributes["poster"]
+                    )
+                    
+                    videos.append(detectedVideo)
+                }
             }
-            
-            // Handle direct src attribute
-            if let src = attributes["src"] {
-                let videoUrl = resolveUrl(src, baseUrl: baseUrl)
-                let metadata = extractVideoMetadata(from: attributes, url: videoUrl)
-                
-                let detectedVideo = DetectedVideo(
-                    url: videoUrl,
-                    title: attributes["title"],
-                    embedType: .html5,
-                    attributes: attributes,
-                    position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
-                    context: attributes["poster"]
-                )
-                
-                videos.append(detectedVideo)
-            }
+        } catch {
+            logger.error("Error detecting HTML5 videos: \(error)")
+            throw error
         }
         
         return videos
     }
     
     private func detectIframeVideos(in html: String, baseUrl: String) async throws -> [DetectedVideo] {
-        let iframePattern = #"<iframe[^>]*src="([^"]*)"[^>]*>(.*?)</iframe>"#
-        let regex = try NSRegularExpression(pattern: iframePattern)
-        let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
-        
         var videos: [DetectedVideo] = []
         
-        for match in matches {
-            guard match.numberOfRanges > 1,
-                  let range = Range(match.range(at: 1), in: html) else {
-                continue
-            }
+        do {
+            let doc = try SwiftSoup.parse(html)
+            let iframeElements = try doc.select("iframe")
             
-            let iframeSrc = String(html[range])
-            let attributes = extractAttributes(from: String(html[match.range(at: 0)]))
-            
-            // Check if this iframe contains video content
-            if isVideoIframe(iframeSrc) {
-                let videoUrl = resolveUrl(iframeSrc, baseUrl: baseUrl)
-                
-                let detectedVideo = DetectedVideo(
-                    url: videoUrl,
-                    title: attributes["title"],
-                    embedType: .iframe,
-                    attributes: attributes,
-                    position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
-                    context: attributes["width"] != nil ? "embedded iframe" : nil
-                )
-                
-                videos.append(detectedVideo)
+            for iframeElement in iframeElements {
+                if let src = try? iframeElement.attr("src"), !src.isEmpty {
+                    let attributes = try extractAttributes(from: iframeElement)
+                    
+                    // Check if this iframe contains video content
+                    if isVideoIframe(src) {
+                        let videoUrl = resolveUrl(src, baseUrl: baseUrl)
+                        
+                        let detectedVideo = DetectedVideo(
+                            url: videoUrl,
+                            title: attributes["title"],
+                            embedType: .iframe,
+                            attributes: attributes,
+                            position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
+                            context: attributes["width"] != nil ? "embedded iframe" : nil
+                        )
+                        
+                        videos.append(detectedVideo)
+                    }
+                }
             }
+        } catch {
+            logger.error("Error detecting iframe videos: \(error)")
+            throw error
         }
         
         return videos
     }
     
     private func detectEmbedVideos(in html: String, baseUrl: String) async throws -> [DetectedVideo] {
-        let embedPattern = #"<embed[^>]*src="([^"]*)"[^>]*>"#
-        let regex = try NSRegularExpression(pattern: embedPattern)
-        let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
-        
         var videos: [DetectedVideo] = []
         
-        for match in matches {
-            guard match.numberOfRanges > 1,
-                  let range = Range(match.range(at: 1), in: html) else {
-                continue
-            }
+        do {
+            let doc = try SwiftSoup.parse(html)
+            let embedElements = try doc.select("embed")
             
-            let embedSrc = String(html[range])
-            let attributes = extractAttributes(from: String(html[match.range(at: 0)]))
-            
-            if isVideoEmbed(embedSrc) {
-                let videoUrl = resolveUrl(embedSrc, baseUrl: baseUrl)
-                
-                let detectedVideo = DetectedVideo(
-                    url: videoUrl,
-                    title: attributes["title"],
-                    embedType: .embed,
-                    attributes: attributes,
-                    position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
-                    context: attributes["type"]
-                )
-                
-                videos.append(detectedVideo)
+            for embedElement in embedElements {
+                if let src = try? embedElement.attr("src"), !src.isEmpty {
+                    let attributes = try extractAttributes(from: embedElement)
+                    
+                    if isVideoEmbed(src) {
+                        let videoUrl = resolveUrl(src, baseUrl: baseUrl)
+                        
+                        let detectedVideo = DetectedVideo(
+                            url: videoUrl,
+                            title: attributes["title"],
+                            embedType: .embed,
+                            attributes: attributes,
+                            position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
+                            context: attributes["type"]
+                        )
+                        
+                        videos.append(detectedVideo)
+                    }
+                }
             }
+        } catch {
+            logger.error("Error detecting embed videos: \(error)")
+            throw error
         }
         
         return videos
@@ -395,6 +355,7 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
     private func detectJavaScriptVideos(in html: String, baseUrl: String) async throws -> [DetectedVideo] {
         var videos: [DetectedVideo] = []
         
+        // For JavaScript videos, we still need to use regex since they're typically in script tags
         // Look for JavaScript patterns that load videos
         let jsPatterns = [
             #"src\s*:\s*["']([^"']*\.mp4[^"']*)["']"#,
@@ -404,57 +365,187 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
             #"video_source\s*=\s*["']([^"']*)["']"#
         ]
         
-        for pattern in jsPatterns {
-            let regex = try NSRegularExpression(pattern: pattern, options: .caseInsensitive)
-            let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
+        do {
+            let doc = try SwiftSoup.parse(html)
+            let scriptElements = try doc.select("script")
             
-            for match in matches {
-                guard match.numberOfRanges > 1,
-                      let range = Range(match.range(at: 1), in: html) else {
-                    continue
+            for scriptElement in scriptElements {
+                if let scriptContent = try? scriptElement.html() {
+                    for pattern in jsPatterns {
+                        if let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) {
+                            let matches = regex.matches(in: scriptContent, options: [], range: NSRange(location: 0, length: scriptContent.utf8.count))
+                            
+                            for match in matches {
+                                if match.numberOfRanges > 1,
+                                   let range = Range(match.range(at: 1), in: scriptContent) {
+                                    let videoUrl = resolveUrl(String(scriptContent[range]), baseUrl: baseUrl)
+                                    
+                                    let detectedVideo = DetectedVideo(
+                                        url: videoUrl,
+                                        title: nil,
+                                        embedType: .javascript,
+                                        attributes: [:],
+                                        position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
+                                        context: "JavaScript-rendered"
+                                    )
+                                    
+                                    videos.append(detectedVideo)
+                                }
+                            }
+                        }
+                    }
                 }
-                
-                let videoUrl = resolveUrl(String(html[range]), baseUrl: baseUrl)
-                
-                let detectedVideo = DetectedVideo(
-                    url: videoUrl,
-                    title: nil,
-                    embedType: .javascript,
-                    attributes: [:],
-                    position: ElementPosition(line: 0, column: 0, elementIndex: 0, parentPath: ""),
-                    context: "JavaScript-rendered"
-                )
-                
-                videos.append(detectedVideo)
             }
+        } catch {
+            logger.error("Error detecting JavaScript videos: \(error)")
         }
         
         return videos
     }
     
-    private func extractAttributes(from element: String) -> [String: String] {
+    private func extractAttributes(from element: Element) throws -> [String: String] {
         var attributes: [String: String] = [:]
         
-        let attributePattern = #"(\w+)="([^"]*)""#
-        let regex = try? NSRegularExpression(pattern: attributePattern)
+        // Use SwiftSoup's public API to get all attribute keys and values
+        // Get the outerHTML and extract attributes using a simple approach
+        let outerHtml = try element.outerHtml()
         
-        if let regex = regex {
-            let matches = regex.matches(in: element, options: [], range: NSRange(location: 0, length: element.utf8.count))
+        // Use a regular expression to extract all attributes
+        do {
+            let attributeRegex = try NSRegularExpression(pattern: "([a-zA-Z-]+)\\s*=\\s*([\"'])([^\"']*)\\2", options: [])
+            let matches = attributeRegex.matches(in: outerHtml, options: [], range: NSRange(outerHtml.startIndex..., in: outerHtml))
             
             for match in matches {
-                guard match.numberOfRanges > 2,
-                      let nameRange = Range(match.range(at: 1), in: element),
-                      let valueRange = Range(match.range(at: 2), in: element) else {
-                    continue
+                if let keyRange = Range(match.range(at: 1), in: outerHtml),
+                   let valueRange = Range(match.range(at: 2), in: outerHtml) {
+                    let key = String(outerHtml[keyRange])
+                    let value = String(outerHtml[valueRange])
+                    attributes[key] = value
                 }
-                
-                let name = String(element[nameRange])
-                let value = String(element[valueRange])
-                attributes[name] = value
+            }
+        } catch {
+            logger.debug("Regex attribute extraction failed: \(error)")
+        }
+        
+        // Fallback: manually check common attributes using SwiftSoup's public attr method
+        let commonAttributes = ["href", "src", "class", "id", "title", "alt", "width", "height", "style"]
+        for attr in commonAttributes {
+            let value = try element.attr(attr)
+            if !value.isEmpty {
+                attributes[attr] = value
             }
         }
         
         return attributes
+    }
+    
+    private func extractArticleInfo(from articleElement: Element, baseUrl: String) async throws -> DetectedArticle? {
+        // Extract title, author, date, content, and videos
+        let title = try articleElement.select("h1, h2, h3, h4, h5, h6").first()?.text() ?? ""
+        let author = try articleElement.select("[class*=author], [rel*=author]")
+            .first()?.text() ?? extractAuthor(from: try articleElement.outerHtml())
+
+        // Extract date from element
+        var date: Date?
+        if let timeElement = try articleElement.select("time").first(),
+           let datetime = try? timeElement.attr("datetime") {
+            date = parseDate(datetime)
+        } else {
+            date = extractPublicationDate(from: try articleElement.outerHtml())
+        }
+
+        // Extract videos within the article
+        var videoPositions: [VideoPosition] = []
+        let videos = try await detectVideos(in: articleElement.outerHtml(), baseUrl: baseUrl)
+
+        for (index, video) in videos.enumerated() {
+            // Generate a UUID from the video URL string for the VideoPosition
+            let videoUUID = UUID(uuidString: video.url) ?? UUID()
+            videoPositions.append(VideoPosition(
+                videoId: videoUUID,
+                positionInArticle: index,
+                context: video.context
+            ))
+        }
+
+        // Create article URL (using baseUrl if no specific URL)
+        let articleUrl = baseUrl
+
+        return DetectedArticle(
+            url: articleUrl,
+            title: title,
+            publicationDate: date,
+            author: author,
+            content: try articleElement.text(),
+            videoReferences: [],
+            metadata: [:]
+        )
+    }
+    
+    private func extractArticleInfo(from doc: Document, baseUrl: String) async throws -> DetectedArticle? {
+        // For whole document, extract main content
+        let title = extractTitle(from: try doc.outerHtml())
+        let author = extractAuthor(from: try doc.outerHtml())
+        let date = extractPublicationDate(from: try doc.outerHtml())
+        
+        // Extract videos from the whole document
+        var videoPositions: [VideoPosition] = []
+        let videos = try await detectVideos(in: doc.outerHtml(), baseUrl: baseUrl)
+        
+        for (index, video) in videos.enumerated() {
+            // Generate a UUID from the video URL string for the VideoPosition
+            let videoUUID = UUID(uuidString: video.url) ?? UUID()
+            videoPositions.append(VideoPosition(
+                videoId: videoUUID,
+                positionInArticle: index,
+                context: nil,
+                elementInfo: [:]
+            ))
+        }
+        
+        return DetectedArticle(
+            url: baseUrl,
+            title: title,
+            publicationDate: date,
+            author: author,
+            content: try doc.text(),
+            videoReferences: [],
+            metadata: [:]
+        )
+    }
+    
+    private func parseDate(_ dateString: String) -> Date? {
+        // Try multiple date formats
+        // Create standard date formatters
+        let dateFormatter1 = DateFormatter()
+        dateFormatter1.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ" // ISO with timezone
+        
+        let dateFormatter2 = DateFormatter()
+        dateFormatter2.dateFormat = "MM/dd/yyyy"
+        
+        let dateFormatter3 = DateFormatter()
+        dateFormatter3.dateFormat = "yyyy-MM-dd"
+        
+        // Ensure all formatters are DateFormatter type
+        let dateFormatters: [DateFormatter] = [
+            dateFormatter1,
+            dateFormatter2,
+            dateFormatter3
+        ]
+        
+        // Try ISO8601 formatter separately
+        let isoFormatter = ISO8601DateFormatter()
+        if let date = isoFormatter.date(from: dateString) {
+            return date
+        }
+        
+        for formatter in dateFormatters {
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+        }
+        
+        return nil
     }
     
     private func isVideoIframe(_ src: String) -> Bool {
@@ -490,54 +581,90 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         }
     }
     
-    private func extractScriptTags(from html: String) -> [String] {
-        let scriptPattern = #"<script[^>]*src="([^"]*)"[^>]*>"#
-        let regex = try? NSRegularExpression(pattern: scriptPattern)
+    private func extractScriptTags(from html: String) throws -> [String] {
+        let doc = try SwiftSoup.parse(html)
+        let scriptElements = try doc.select("script[src]")
         
-        guard let regex = regex else { return [] }
-        
-        let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
-        
-        return matches.compactMap { match in
-            guard match.numberOfRanges > 1,
-                  let range = Range(match.range(at: 1), in: html) else {
-                return nil
-            }
-            return String(html[range])
-        }
+        return try scriptElements.map { try $0.attr("src") }.filter { !$0.isEmpty }
     }
     
-    private func extractStyleTags(from html: String) -> [String] {
-        let stylePattern = #"<link[^>]*rel="stylesheet"[^>]*href="([^"]*)"[^>]*>"#
-        let regex = try? NSRegularExpression(pattern: stylePattern)
+    private func extractStyleTags(from html: String) throws -> [String] {
+        let doc = try SwiftSoup.parse(html)
+        let styleElements = try doc.select("link[rel=stylesheet], link[rel='stylesheet']")
         
-        guard let regex = regex else { return [] }
+        return try styleElements.map { try $0.attr("href") }.filter { !$0.isEmpty }
+    }
+    
+    // Link extraction is handled by the regex implementation below
+    
+    private func extractArticlesFromHTML(_ html: String, baseUrl: String) async throws -> [DetectedArticle] {
+        logger.info("Extracting articles from HTML")
         
-        let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
+        var detectedArticles: [DetectedArticle] = []
         
-        return matches.compactMap { match in
-            guard match.numberOfRanges > 1,
-                  let range = Range(match.range(at: 1), in: html) else {
-                return nil
+        do {
+            let doc = try SwiftSoup.parse(html)
+            
+            // Extract articles using article tags
+            let articleElements = try doc.select("article")
+            for articleElement in articleElements {
+                if let article = try await extractArticleInfo(from: articleElement, baseUrl: baseUrl) {
+                    detectedArticles.append(article)
+                }
             }
-            return String(html[range])
+            
+            // Extract articles using div with class containing "article", "post", or "entry"
+            let articleDivs = try doc.select("div[class*=article], div[class*=post], div[class*=entry]")
+            for divElement in articleDivs {
+                if let article = try await extractArticleInfo(from: divElement, baseUrl: baseUrl) {
+                    // Avoid duplicates
+                    if !detectedArticles.contains(where: { $0.url == article.url }) {
+                        detectedArticles.append(article)
+                    }
+                }
+            }
+            
+            // If no articles found, treat the whole page as one article
+            if detectedArticles.isEmpty {
+                if let wholePageArticle = try await extractArticleInfo(from: doc, baseUrl: baseUrl) {
+                    detectedArticles.append(wholePageArticle)
+                }
+            }
+        } catch {
+            logger.error("Error extracting articles: \(error)")
+            throw error
         }
+        
+        // Remove duplicates
+        detectedArticles = removeDuplicateArticles(detectedArticles)
+        
+        logger.info("Found \(detectedArticles.count) articles")
+        return detectedArticles
     }
     
     private func extractLinks(from html: String) -> [String] {
-        let linkPattern = #"<a[^>]*href="([^"]*)"[^>]*>"#
-        let regex = try? NSRegularExpression(pattern: linkPattern)
-        
-        guard let regex = regex else { return [] }
-        
-        let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
-        
-        return matches.compactMap { match in
-            guard match.numberOfRanges > 1,
-                  let range = Range(match.range(at: 1), in: html) else {
-                return nil
+        do {
+            // Try using SwiftSoup first for better parsing
+            let doc = try SwiftSoup.parse(html)
+            let linkElements = try doc.select("a[href]")
+            
+            return try linkElements.map { try $0.attr("href") }.filter { !$0.isEmpty }
+        } catch {
+            // Fall back to regex if SwiftSoup parsing fails
+            let linkPattern = #"<a[^>]*href="([^"]*)"[^>]*>"#
+            let regex = try? NSRegularExpression(pattern: linkPattern)
+            
+            guard let regex = regex else { return [] }
+            
+            let matches = regex.matches(in: html, options: [], range: NSRange(location: 0, length: html.utf8.count))
+            
+            return matches.compactMap { match in
+                guard match.numberOfRanges > 1,
+                      let range = Range(match.range(at: 1), in: html) else {
+                    return nil
+                }
+                return String(html[range])
             }
-            return String(html[range])
         }
     }
     
@@ -616,8 +743,34 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         return context.isEmpty ? nil : context
     }
     
+    private func extractAttributes(from element: String) -> [String: String] {
+        var attributes: [String: String] = [:]
+        
+        // Extract common video attributes
+        let attributePattern = #"([^=\s]+)="([^"]*)"#
+        let regex = try? NSRegularExpression(pattern: attributePattern)
+        
+        guard let regex = regex else { return attributes }
+        
+        let matches = regex.matches(in: element, options: [], range: NSRange(location: 0, length: element.utf8.count))
+        
+        for match in matches {
+            guard match.numberOfRanges > 2,
+                  let nameRange = Range(match.range(at: 1), in: element),
+                  let valueRange = Range(match.range(at: 2), in: element) else {
+                continue
+            }
+            
+            let name = String(element[nameRange])
+            let value = String(element[valueRange])
+            attributes[name] = value
+        }
+        
+        return attributes
+    }
+    
     private func extractArticleMetadata(from html: String) -> [String: String] {
-        var metadata: [String: String] = []
+        var metadata: [String: String] = [:]
         
         let metaPattern = #"<meta[^>]*name="([^"]*)"[^>]*content="([^"]*)"[^>]*>"#
         let regex = try? NSRegularExpression(pattern: metaPattern)
@@ -641,7 +794,15 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         return metadata
     }
     
-    private func extractArticlesFromHTML(_ html: String, _ baseUrl: String) async throws -> [DetectedArticle] {
-        return try await extractArticles(from: html, baseUrl: baseUrl)
+    // Article extraction implementation is already defined earlier in the file
+}
+
+// MARK: - Helper for Array chunking
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map { startIndex in
+            let endIndex = Swift.min(startIndex + size, count)
+            return Array(self[startIndex..<endIndex])
+        }
     }
 }

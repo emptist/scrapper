@@ -8,13 +8,8 @@ public protocol URLSessionProtocol {
 
 /// Extension to make URLSession conform to URLSessionProtocol
 extension URLSession: URLSessionProtocol {
-    public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        return try await data(for: request)
-    }
-    
-    public func data(from url: URL) async throws -> (Data, URLResponse) {
-        return try await data(from: url)
-    }
+    // No need to implement these methods since URLSession already provides them
+    // These methods are declared in the protocol for mocking/testing purposes
 }
 
 /// Protocol for logging operations

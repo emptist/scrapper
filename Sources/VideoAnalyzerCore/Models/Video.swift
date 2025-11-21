@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a video found on a web page
-public struct Video: Codable, Equatable, Hashable {
+public struct Video: Codable, Equatable, Hashable, Sendable {
     public let id: UUID
     public let url: String
     public let title: String?
@@ -41,7 +41,7 @@ public struct Video: Codable, Equatable, Hashable {
 }
 
 /// Represents the format of a video
-public enum VideoFormat: String, Codable, CaseIterable {
+public enum VideoFormat: String, Codable, CaseIterable, Sendable {
     case mp4 = "mp4"
     case webm = "webm"
     case ogg = "ogg"
@@ -58,7 +58,7 @@ public enum VideoFormat: String, Codable, CaseIterable {
 }
 
 /// Represents how a video is embedded on a page
-public enum EmbedType: String, Codable, CaseIterable {
+public enum EmbedType: String, Codable, CaseIterable, Sendable {
     case html5 = "html5"
     case iframe = "iframe"
     case javascript = "javascript"
