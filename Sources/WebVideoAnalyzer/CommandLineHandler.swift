@@ -33,7 +33,11 @@ class CommandLineHandler {
             }
             
             let url = arguments[2]
-            await analysisService.performAnalysis(url: url)
+            do {
+                _ = try await analysisService.performAnalysis(url: url)
+            } catch {
+                print("Analysis failed: \(error.localizedDescription)")
+            }
             
         case "batch":
             if arguments.count < 3 {
@@ -43,7 +47,11 @@ class CommandLineHandler {
             }
             
             let filePath = arguments[2]
-            await analysisService.performBatchAnalysis(filePath: filePath)
+            do {
+                _ = try await analysisService.performBatchAnalysis(filePath: filePath)
+            } catch {
+                print("Batch analysis failed: \(error.localizedDescription)")
+            }
             
         case "validate":
             if arguments.count < 3 {
@@ -53,7 +61,11 @@ class CommandLineHandler {
             }
             
             let url = arguments[2]
-            await analysisService.performValidation(url: url)
+            do {
+                _ = try await analysisService.performValidation(url: url)
+            } catch {
+                print("Validation failed: \(error.localizedDescription)")
+            }
             
         case "--help", "-h":
             printUsage()
