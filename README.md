@@ -38,7 +38,14 @@ try analyzer.export(result, format: .html)
 
 ## Testing
 
-The project uses Swift's latest testing features for comprehensive unit and integration tests:
+The project uses Swift's latest testing features for comprehensive unit and integration tests with a focus on resilience:
+
+### Key Testing Principles
+- **Resilient Assertions**: Uses range validations and content presence checks instead of brittle exact matches
+- **Input Immutability**: Ensures test inputs remain unchanged during processing
+- **Comprehensive Coverage**: Tests cover video detection, format handling, YouTube embeds, and medical content detection
+- **Error Management**: Verifies robust error handling and logging
+- **Output Validation**: Confirms proper export functionality in both JSON and HTML formats
 
 ```swift
 @testable import VideoAnalyzerCore
@@ -46,7 +53,19 @@ import Testing
 
 struct VideoAnalyzerTests {
     @Test func videoDetection() async throws {
-        // Test video detection logic
+        // Test using resilient assertions that verify core functionality
+        // without being overly sensitive to implementation details
     }
 }
+```
+
+### Running Tests
+To run the tests, use the Swift package manager:
+```bash
+swift test
+```
+
+For running specific tests:
+```bash
+swift test --filter VideoAnalyzerEngineTests
 ```
