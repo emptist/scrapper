@@ -3,7 +3,7 @@ import VideoAnalyzerCore
 
 /// Main application entry point conforming to SwiftUI App protocol
 @main
-struct ScrapperApp: App {
+struct VideoFinderApp: App {
     // Create necessary dependencies
     private let logger = DefaultLogger()
     private let analysisService: AnalysisService
