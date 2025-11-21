@@ -13,7 +13,7 @@ struct WebVideoAnalyzerApp {
         let arguments = CommandLine.arguments
         
         guard arguments.count > 1 else {
-            printUsage()
+            Self.printUsage()
             return
         }
         
@@ -24,27 +24,27 @@ struct WebVideoAnalyzerApp {
             case "analyze":
                 if arguments.count < 3 {
                     print("Error: URL required for analyze command")
-                    printUsage()
+                    Self.printUsage()
                     return
                 }
                 
                 let url = arguments[2]
-                await performAnalysis(url: url, analyzer: analyzer, logger: logger)
+                await Self.performAnalysis(url: url, analyzer: analyzer, logger: logger)
                 
             case "batch":
                 if arguments.count < 3 {
                     print("Error: File path required for batch command")
-                    printUsage()
+                    Self.printUsage()
                     return
                 }
                 
                 let filePath = arguments[2]
-                await performBatchAnalysis(filePath: filePath, analyzer: analyzer, logger: logger)
+                await Self.performBatchAnalysis(filePath: filePath, analyzer: analyzer, logger: logger)
                 
             case "validate":
                 if arguments.count < 3 {
                     print("Error: URL required for validate command")
-                    printUsage()
+                    Self.printUsage()
                     return
                 }
                 
@@ -59,13 +59,10 @@ struct WebVideoAnalyzerApp {
                 printUsage()
             }
             
-        } catch {
-            logger.error("Command failed: \(error.localizedDescription)")
-            print("Error: \(error.localizedDescription)")
         }
     }
     
-    private static func printUsage() {
+    static func printUsage() {
         print("""
         Web Video Analyzer - Comprehensive video content analysis tool
         

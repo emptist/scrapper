@@ -19,8 +19,6 @@ let package = Package(
     dependencies: [
         .package(url: "git@github.com:Alamofire/Alamofire.git", from: "5.10.0"),
         .package(url: "git@github.com:scinfu/SwiftSoup.git", from: "2.7.0"),
-        .package(url: "git@github.com:onevcat/Kingfisher.git", from: "7.12.0"),
-        .package(url: "git@github.com:SwiftUIX/SwiftUIX.git", from: "0.1.0"),
     ],
     targets: [
         .executableTarget(
