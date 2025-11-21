@@ -20,7 +20,7 @@ public class HTMLParserService: HTMLParsing, VideoDetecting, ContentExtracting {
         let articles = try await extractArticles(from: html, baseUrl: baseUrl)
         let scripts = try extractScriptTags(from: html)
         let styles = try extractStyleTags(from: html)
-        let links = try extractLinks(from: html)
+        let links = extractLinks(from: html)
         
         return ParsedHTML(
             document: html,
