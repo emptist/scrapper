@@ -71,9 +71,11 @@ To build the command-line version:
 # Build the project
 swift build
 
-# Run the command-line tool
+# Run the command-line tool using Swift Package Manager
 swift run WebVideoAnalyzer <command> [options]
 ```
+
+After building, you can also run the compiled binary directly (see the Command-Line Usage section below for the binary command format).
 
 ## Recent Improvements and Fixes
 
@@ -90,6 +92,20 @@ The following significant improvements and fixes have been implemented in the la
 ## Command-Line Usage
 
 The Web Video Analyzer provides a comprehensive command-line interface for analyzing websites for video content. It supports analyzing individual URLs, processing batch files of URLs, and validating URLs before full analysis.
+
+### Command Format
+
+There are two ways to run the command-line tool:
+
+1. **Using Swift Package Manager** (during development):
+   ```bash
+   swift run WebVideoAnalyzer <command> [options]
+   ```
+
+2. **Using the compiled binary** (after building):
+   ```bash
+   WebVideoAnalyzer <command> [options]
+   ```
 
 ### Available Commands
 
