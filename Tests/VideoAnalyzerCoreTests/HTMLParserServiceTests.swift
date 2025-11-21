@@ -4,6 +4,60 @@ import XCTest
 
 final class HTMLParserServiceTests: XCTestCase {
     
+    // Test specifically for the extractPublicationDate method with multi-byte characters
+    // This test verifies our fix for the NSRegularExpression crash issue
+    func testExtractPublicationDateWithMultiByteCharacters() {
+        let htmlParser = HTMLParserService()
+        
+        // Test case with multi-byte characters (emojis and non-ASCII characters)
+        let htmlWithMultiByte = """
+        <html>
+        <head><title>Test with Multi-byte Characters</title></head>
+        <body>
+            <article>
+                <h1>测试标题 🔍</h1>
+                <p>Content with various characters: 日本語, 한국어, русский, español, français</p>
+                <time datetime="2023-12-01">December 1, 2023</time>
+                <div>Last updated: 2023-12-01</div>
+            </article>
+        </body>
+        </html>
+        """
+        
+        // This should not crash with our fix
+        let date = htmlParser.extractPublicationDate(from: htmlWithMultiByte)
+        
+        // Verify that the date is extracted correctly
+        let calendar = Calendar.current
+        let components = calendar.dateComponents([.year, .month, .day], from: date!)
+        XCTAssertEqual(components.year, 2023)
+        XCTAssertEqual(components.month, 12)
+        XCTAssertEqual(components.day, 1)
+    }
+    
+    // Test with empty HTML input
+    func testExtractPublicationDateWithEmptyHTML() {
+        let htmlParser = HTMLParserService()
+        let date = htmlParser.extractPublicationDate(from: "")
+        XCTAssertNil(date, "Should return nil for empty HTML")
+    }
+    
+    // Test with HTML containing no date information
+    func testExtractPublicationDateWithNoDate() {
+        let htmlParser = HTMLParserService()
+        let htmlWithoutDate = """
+        <html>
+        <head><title>Page Without Date</title></head>
+        <body>
+            <p>This page has no date information</p>
+        </body>
+        </html>
+        """
+        
+        let date = htmlParser.extractPublicationDate(from: htmlWithoutDate)
+        XCTAssertNil(date, "Should return nil when no date is found")
+    }
+    
     func testParseHTMLWithVideos() async throws {
         let htmlParser = HTMLParserService()
         let html = """
