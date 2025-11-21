@@ -1,6 +1,7 @@
 import Foundation
 import VideoAnalyzerCore
 
+// Main application entry point with @main attribute
 @main
 struct WebVideoAnalyzerApp {
     static func main() async {
@@ -19,46 +20,43 @@ struct WebVideoAnalyzerApp {
         
         let command = arguments[1]
         
-        do {
-            switch command {
-            case "analyze":
-                if arguments.count < 3 {
-                    print("Error: URL required for analyze command")
-                    Self.printUsage()
-                    return
-                }
-                
-                let url = arguments[2]
-                await Self.performAnalysis(url: url, analyzer: analyzer, logger: logger)
-                
-            case "batch":
-                if arguments.count < 3 {
-                    print("Error: File path required for batch command")
-                    Self.printUsage()
-                    return
-                }
-                
-                let filePath = arguments[2]
-                await Self.performBatchAnalysis(filePath: filePath, analyzer: analyzer, logger: logger)
-                
-            case "validate":
-                if arguments.count < 3 {
-                    print("Error: URL required for validate command")
-                    Self.printUsage()
-                    return
-                }
-                
-                let url = arguments[2]
-                await Self.performValidation(url: url, analyzer: analyzer, logger: logger)
-                
-            case "--help", "-h":
+        switch command {
+        case "analyze":
+            if arguments.count < 3 {
+                print("Error: URL required for analyze command")
                 Self.printUsage()
-                
-            default:
-                print("Unknown command: \(command)")
-                Self.printUsage()
+                return
             }
             
+            let url = arguments[2]
+            await Self.performAnalysis(url: url, analyzer: analyzer, logger: logger)
+            
+        case "batch":
+            if arguments.count < 3 {
+                print("Error: File path required for batch command")
+                Self.printUsage()
+                return
+            }
+            
+            let filePath = arguments[2]
+            await Self.performBatchAnalysis(filePath: filePath, analyzer: analyzer, logger: logger)
+            
+        case "validate":
+            if arguments.count < 3 {
+                print("Error: URL required for validate command")
+                Self.printUsage()
+                return
+            }
+            
+            let url = arguments[2]
+            await Self.performValidation(url: url, analyzer: analyzer, logger: logger)
+            
+        case "--help", "-h":
+            Self.printUsage()
+            
+        default:
+            print("Unknown command: \(command)")
+            Self.printUsage()
         }
     }
     
@@ -196,7 +194,7 @@ struct WebVideoAnalyzerApp {
             let detailedFileName = "/tmp/batch_analysis_detailed_\(timestamp).json"
             
             // Save summary
-            let summary = [
+            let summary: [String: Any] = [
                 "totalUrls": analyses.count,
                 "totalVideos": totalVideos,
                 "totalArticles": totalArticles,
@@ -209,7 +207,7 @@ struct WebVideoAnalyzerApp {
                         "errors": analysis.errorLog
                     ]
                 }
-            ] as [String : Any]
+            ]
             
             let summaryData = try JSONSerialization.data(withJSONObject: summary, options: .prettyPrinted)
             try summaryData.write(to: URL(fileURLWithPath: summaryFileName))
