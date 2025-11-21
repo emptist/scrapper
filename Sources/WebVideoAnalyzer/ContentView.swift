@@ -17,7 +17,7 @@ class ContentViewModel: ObservableObject {
     private let analysisService: AnalysisService
     
     init() {
-        self.analysisService = AnalysisService()
+        self.analysisService = AnalysisService(logger: logger)
     }
     
     /// Analyze a single URL

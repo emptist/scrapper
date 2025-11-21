@@ -18,7 +18,7 @@ struct VideoFinderApp: App {
         shouldShowUI = arguments.count <= 1 || (arguments.count > 1 && (arguments[1] == "--gui" || arguments[1] == "-g"))
         
         // Initialise services with dependencies
-        self.analysisService = AnalysisService()
+        self.analysisService = AnalysisService(logger: logger)
         self.commandLineHandler = CommandLineHandler(logger: logger, analysisService: analysisService)
         
         // Handle command-line arguments if UI shouldn't be shown
