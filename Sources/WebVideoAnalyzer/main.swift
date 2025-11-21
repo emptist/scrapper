@@ -49,14 +49,14 @@ struct WebVideoAnalyzerApp {
                 }
                 
                 let url = arguments[2]
-                await performValidation(url: url, analyzer: analyzer, logger: logger)
+                await Self.performValidation(url: url, analyzer: analyzer, logger: logger)
                 
             case "--help", "-h":
-                printUsage()
+                Self.printUsage()
                 
             default:
                 print("Unknown command: \(command)")
-                printUsage()
+                Self.printUsage()
             }
             
         }
